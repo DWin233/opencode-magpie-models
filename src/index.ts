@@ -99,14 +99,16 @@ const home = (p: string) => (p.startsWith("~/") ? join(homedir(), p.slice(2)) : 
 export default Plugin.define({
   id: "opencode-magpie-models",
   async setup(ctx) {
-    // A directory-discovery plugin gets no options, so configuration comes from env and constants.
-    const baseURL = (process.env.MAGPIE_BASE_URL ?? "http://127.0.0.1:8790/v1").replace(/\/+$/, "")
-    const keyFile = process.env.MAGPIE_KEY_FILE || undefined
+    // Options arrive only through a config entry ({ package, options } in opencode.json);
+    // a directory-discovered plugin gets none and falls back to env, then defaults.
+    const o = (ctx.options ?? {}) as { baseURL?: unknown; keyFile?: unknown; id?: unknown; name?: unknown }
+    const baseURL = (typeof o.baseURL === "string" ? o.baseURL : process.env.MAGPIE_BASE_URL ?? "http://127.0.0.1:8790/v1").replace(/\/+$/, "")
+    const keyFile = typeof o.keyFile === "string" ? o.keyFile : process.env.MAGPIE_KEY_FILE || undefined
     const key = keyFile ? (await readFile(home(keyFile), "utf8")).trim() : "magpie"
-    // Test-phase id: the shipped form should make this configurable again and default to "magpie";
+    // Test-phase defaults: the shipped form should default the id to "magpie";
     // "magpie-test" avoids colliding with the v1 provider block proxy software writes.
-    const id = "magpie-test"
-    const name = "Magpie"
+    const id = typeof o.id === "string" ? o.id : "magpie-test"
+    const name = typeof o.name === "string" ? o.name : "Magpie"
     const cacheFile = join(process.env.XDG_CACHE_HOME || join(homedir(), ".cache"), "opencode-magpie-models", `${id}.json`)
 
     const fetchList = async () => {
