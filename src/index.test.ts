@@ -23,7 +23,7 @@ test("fills absent prices with 0, cache is always complete", () => {
 
 test("keeps both cache keys when only one cache price exists", () => {
   const [m] = toModels("magpie-test", [{ id: "read-only", pricing: { prompt: "0.000002", input_cache_read: "0.0000002" } }])
-  expect(m.cost).toEqual([{ input: 2, output: 0, cache: { read: 0.0000002 * 1e6, write: 0 } }])
+  expect(m.cost).toEqual([{ input: 2, output: 0, cache: { read: 0.2, write: 0 } }])
 })
 
 test("gives a model without pricing an empty cost array", () => {

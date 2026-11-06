@@ -24,11 +24,13 @@ type ModelCost = { input: number; output: number; cache: { read: number; write: 
 const positive = (n: unknown): n is number => typeof n === "number" && Number.isInteger(n) && n > 0
 const strings = (a: unknown): a is string[] => Array.isArray(a) && a.length > 0 && a.every((s) => typeof s === "string")
 
-// Magpie quotes USD per token; OpenCode's cost is USD per million tokens.
+// Magpie quotes USD per token; OpenCode's cost is USD per million tokens. The product
+// is rounded to 10 decimals to shed the binary tail (1e-7 * 1e6 = 0.09999999999999999,
+// the reference snapshots write 0.1).
 const perMillion = (v: unknown): number | undefined => {
   if (typeof v !== "string") return undefined
   const n = Number.parseFloat(v)
-  return Number.isFinite(n) ? n * 1e6 : undefined
+  return Number.isFinite(n) ? Number((n * 1e6).toFixed(10)) : undefined
 }
 
 const costOf = (pricing: Raw["pricing"]): ModelCost | undefined => {
