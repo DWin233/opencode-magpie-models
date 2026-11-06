@@ -11,12 +11,14 @@ test("maps per-token pricing to dollars per million tokens", () => {
       input_cache_write: "0.00000375",
     },
   }])
-  expect(m.cost).toEqual({ input: 3, output: 15, cache: { read: 0.3, write: 3.75 } })
+  // The wire protocol (GET /api/model) encodes cost as an array of tier entries:
+  // one entry with no tier is the default tier. Plain objects only pass config decoding.
+  expect(m.cost).toEqual([{ input: 3, output: 15, cache: { read: 0.3, write: 3.75 } }])
 })
 
 test("writes only the pricing sub-fields Magpie provides", () => {
   const [m] = toModels("magpie-test", [{ id: "partial", pricing: { prompt: "0.000002" } }])
-  expect(m.cost).toEqual({ input: 2 })
+  expect(m.cost).toEqual([{ input: 2 }])
 })
 
 test("leaves cost off a model without pricing", () => {

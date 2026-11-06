@@ -76,7 +76,9 @@ export function toModels(providerID: string, raws: readonly Raw[]): Model.Info[]
         tools: raw.tool_call === true,
       },
       variants,
-      ...(cost ? { cost: cost as unknown as Model.Info["cost"] } : {}),
+      // The wire protocol (GET /api/model) carries cost as an array of tier entries —
+      // one entry with no tier is the base price. Plain objects only pass config decoding.
+      ...(cost ? { cost: [cost] } : {}),
       limit: {
         context: positive(raw.context_length) ? raw.context_length : base.limit.context,
         output: positive(raw.max_output_tokens) ? raw.max_output_tokens : base.limit.output,
