@@ -99,15 +99,14 @@ const home = (p: string) => (p.startsWith("~/") ? join(homedir(), p.slice(2)) : 
 export default Plugin.define({
   id: "opencode-magpie-models",
   async setup(ctx) {
-    // Options arrive only through a config entry ({ package, options } in opencode.json);
-    // a directory-discovered plugin gets none and falls back to env, then defaults.
-    const o = (ctx.options ?? {}) as { baseURL?: unknown; keyFile?: unknown; id?: unknown; name?: unknown }
+    // Options arrive through a config entry ({ package, options } in opencode.json);
+    // a directory-discovered plugin gets none and falls back to env, then the
+    // upstream defaults.
+    const o = (ctx.options ?? {}) as { baseURL?: unknown; keyFile?: unknown; id?: unknown; name?: unknown; refreshMinutes?: unknown }
     const baseURL = (typeof o.baseURL === "string" ? o.baseURL : process.env.MAGPIE_BASE_URL ?? "http://127.0.0.1:8790/v1").replace(/\/+$/, "")
     const keyFile = typeof o.keyFile === "string" ? o.keyFile : process.env.MAGPIE_KEY_FILE || undefined
     const key = keyFile ? (await readFile(home(keyFile), "utf8")).trim() : "magpie"
-    // Test-phase defaults: the shipped form should default the id to "magpie";
-    // "magpie-test" avoids colliding with the v1 provider block proxy software writes.
-    const id = typeof o.id === "string" ? o.id : "magpie-test"
+    const id = typeof o.id === "string" ? o.id : "magpie"
     const name = typeof o.name === "string" ? o.name : "Magpie"
     const cacheFile = join(process.env.XDG_CACHE_HOME || join(homedir(), ".cache"), "opencode-magpie-models", `${id}.json`)
 
@@ -145,6 +144,7 @@ export default Plugin.define({
     })
 
     // The background service lives for days: pick up models Magpie adds meanwhile.
+    const minutes = typeof o.refreshMinutes === "number" && o.refreshMinutes > 0 ? o.refreshMinutes : 60
     const timer = setInterval(async () => {
       try {
         const next = await fetchList()
@@ -154,7 +154,7 @@ export default Plugin.define({
       } catch (e) {
         console.error(`opencode-magpie-models: refresh failed: ${e}`)
       }
-    }, 60 * 60_000)
+    }, minutes * 60_000)
     return () => clearInterval(timer)
   },
 })

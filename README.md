@@ -25,8 +25,8 @@ Add it to `opencode.json(c)` by its Git URL (and remove any hand-written provide
       "options": {
         "baseURL": "http://127.0.0.1:8790/v1",
         "keyFile": "~/.secrets/magpie-key", // file holding a Magpie gateway key
-        // optional: "id" (default "magpie-test" while in testing, "magpie" at release),
-        // "name" (default "Magpie")
+        // optional: "id" (default "magpie"), "name" (default "Magpie"),
+        // "refreshMinutes" (default 60)
       },
     },
   ],
@@ -44,7 +44,8 @@ OpenCode picks up the change by itself (or run `opencode service restart`). Mode
 
 A plugin discovered through `.opencode/plugins/` gets no options, so `setup` falls back to
 environment variables: `MAGPIE_BASE_URL` (default `http://127.0.0.1:8790/v1`) and `MAGPIE_KEY_FILE`
-(default: the literal key `magpie`). The provider id then defaults to `magpie-test`.
+(default: the literal key `magpie`). Other options keep their defaults (`id` "magpie",
+`refreshMinutes` 60).
 
 Tested with OpenCode 2.2.5.
 
