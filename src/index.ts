@@ -65,8 +65,7 @@ export function toModels(providerID: string, raws: readonly Raw[]): Model.Info[]
     const cost = costOf(raw.pricing)
     return {
       ...base,
-      name: raw.magpie_label ?? raw.display_name ?? raw.id,
-      capabilities: {
+      name: raw.magpie_label ?? raw.display_name ?? raw.id,      capabilities: {
         ...base.capabilities,
         // Magpie rejects images for a model it marks blind, and OpenCode only sends what is declared
         input: strings(raw.modalities?.input) ? raw.modalities.input : ["text"],
@@ -75,8 +74,10 @@ export function toModels(providerID: string, raws: readonly Raw[]): Model.Info[]
       },
       variants,
       // The wire protocol (GET /api/model) carries cost as an array of tier entries —
-      // one entry with no tier is the base price. Plain objects only pass config decoding.
-      ...(cost ? { cost: [cost] } : {}),
+      // one entry with no tier is the base price — and the key itself is required on
+      // every model, so unpriced models get an empty array. Plain objects only pass
+      // config decoding.
+      cost: cost ? [cost] : [],
       limit: {
         context: positive(raw.context_length) ? raw.context_length : base.limit.context,
         output: positive(raw.max_output_tokens) ? raw.max_output_tokens : base.limit.output,

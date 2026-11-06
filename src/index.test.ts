@@ -26,9 +26,9 @@ test("keeps both cache keys when only one cache price exists", () => {
   expect(m.cost).toEqual([{ input: 2, output: 0, cache: { read: 0.0000002 * 1e6, write: 0 } }])
 })
 
-test("leaves cost off a model without pricing", () => {
+test("gives a model without pricing an empty cost array", () => {
   const [m] = toModels("magpie-test", [{ id: "free" }])
-  expect("cost" in m).toBe(false)
+  expect(m.cost).toEqual([])
 })
 
 test("maps tool_call to capabilities.tools", () => {
