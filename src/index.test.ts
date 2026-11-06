@@ -21,6 +21,11 @@ test("writes only the pricing sub-fields Magpie provides", () => {
   expect(m.cost).toEqual([{ input: 2 }])
 })
 
+test("fills missing cache sub-prices with 0 once any cache price exists", () => {
+  const [m] = toModels("magpie-test", [{ id: "read-only", pricing: { prompt: "0.000002", input_cache_read: "0.0000002" } }])
+  expect(m.cost).toEqual([{ input: 2, cache: { read: 0.2, write: 0 } }])
+})
+
 test("leaves cost off a model without pricing", () => {
   const [m] = toModels("magpie-test", [{ id: "free" }])
   expect("cost" in m).toBe(false)

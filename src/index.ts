@@ -41,9 +41,9 @@ const costOf = (pricing: Raw["pricing"]): ModelCost | undefined => {
   if (input !== undefined) cost.input = input
   if (output !== undefined) cost.output = output
   if (read !== undefined || write !== undefined) {
-    cost.cache = {}
-    if (read !== undefined) cost.cache.read = read
-    if (write !== undefined) cost.cache.write = write
+    // The wire protocol requires both cache keys once cache is present; an unreported
+    // sub-price is treated as 0 (the same convention the proxy software writes out).
+    cost.cache = { read: read ?? 0, write: write ?? 0 }
   }
   return cost
 }
