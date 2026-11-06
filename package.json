@@ -10,7 +10,7 @@
     "test": "bun test"
   },
   "dependencies": {
-    "@opencode/plugin": "^2.1.2"
+    "@opencode/plugin": "2.1.2"
   },
   "license": "MIT",
   "keywords": [

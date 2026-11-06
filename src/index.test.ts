@@ -56,6 +56,14 @@ test("appends a priority service-tier fast variant after each reasoning variant"
   } as any)
 })
 
+test("runtime imports stay inside the whitelist (node builtins + the plugin SDK)", async () => {
+  // Guards the dependency footprint: any new bare import here means a new dependency
+  // subtree installed for every user of the plugin.
+  const src = await Bun.file(new URL("./index.ts", import.meta.url)).text()
+  const bare = [...src.matchAll(/from\s+"([^".][^"]*)"/g)].map((m) => m[1])
+  expect(bare.filter((s) => !s.startsWith("node:"))).toEqual(["@opencode/plugin"])
+})
+
 test("keeps the original metadata mapping", () => {
   const [m] = toModels("magpie-test", [{
     id: "claude/claude-sonnet-5-5",
