@@ -23,7 +23,7 @@ Add it to `opencode.json(c)` by its Git URL (and remove any hand-written provide
     {
       "package": "github:DWin233/opencode-magpie-models",
       "options": {
-        "baseURL": "http://127.0.0.1:8790/v1",
+        "baseURL": "http://127.0.0.1:3425/v1",
         "keyFile": "~/.secrets/magpie-key", // file holding a Magpie gateway key
         // optional: "id" (default "magpie"), "name" (default "Magpie"),
         // "refreshMinutes" (default 60),
@@ -58,7 +58,7 @@ OpenCode picks up a changed entry by itself (or run `opencode service restart`).
 ### Without a config entry
 
 A plugin discovered through `.opencode/plugins/` gets no options, so `setup` falls back to
-environment variables: `MAGPIE_BASE_URL` (default `http://127.0.0.1:8790/v1`) and `MAGPIE_KEY_FILE`
+environment variables: `MAGPIE_BASE_URL` (default `http://127.0.0.1:3425/v1`) and `MAGPIE_KEY_FILE`
 (default: the literal key `magpie`). Other options keep their defaults (`id` "magpie",
 `refreshMinutes` 60, `modelFilter` unset — no filtering; it has no environment equivalent).
 
@@ -81,7 +81,7 @@ and no shared service:
   "plugins": [
     {
       "package": "F:/code/opencode-magpie-models",
-      "options": { "id": "magpie", "name": "Magpie", "baseURL": "http://127.0.0.1:8790/v1" },
+      "options": { "id": "magpie", "name": "Magpie", "baseURL": "http://127.0.0.1:3425/v1" },
     },
   ],
 }

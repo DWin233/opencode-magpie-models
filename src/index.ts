@@ -128,7 +128,7 @@ export default Plugin.define({
     // a directory-discovered plugin gets none and falls back to env, then the
     // upstream defaults.
     const o = (ctx.options ?? {}) as { baseURL?: unknown; keyFile?: unknown; id?: unknown; name?: unknown; refreshMinutes?: unknown; modelFilter?: unknown }
-    const baseURL = (typeof o.baseURL === "string" ? o.baseURL : process.env.MAGPIE_BASE_URL ?? "http://127.0.0.1:8790/v1").replace(/\/+$/, "")
+    const baseURL = (typeof o.baseURL === "string" ? o.baseURL : process.env.MAGPIE_BASE_URL ?? "http://127.0.0.1:3425/v1").replace(/\/+$/, "")
     const keyFile = typeof o.keyFile === "string" ? o.keyFile : process.env.MAGPIE_KEY_FILE || undefined
     const key = keyFile ? (await readFile(home(keyFile), "utf8")).trim() : "magpie"
     const id = typeof o.id === "string" ? o.id : "magpie"
