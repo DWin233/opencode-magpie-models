@@ -33,18 +33,17 @@ const perMillion = (v: unknown): number | undefined => {
 
 const costOf = (pricing: Raw["pricing"]): ModelCost | undefined => {
   if (!pricing) return undefined
-  const cost: ModelCost = {}
-  const input = perMillion(pricing.prompt)
-  const output = perMillion(pricing.completion)
-  const read = perMillion(pricing.input_cache_read)
-  const write = perMillion(pricing.input_cache_write)
-  if (input !== undefined) cost.input = input
-  if (output !== undefined) cost.output = output
-  // The wire protocol validates a cost entry strictly: cache is mandatory, and so are
-  // cache.read/cache.write once the object exists. An unreported sub-price becomes 0
-  // (the same convention the proxy software's snapshots use).
-  cost.cache = { read: perMillion(pricing.input_cache_read) ?? 0, write: perMillion(pricing.input_cache_write) ?? 0 }
-  return cost
+  // The wire protocol validates a cost entry strictly: input, output and cache (with
+  // cache.read and cache.write) are all required keys. A price Magpie does not report
+  // is 0 — the same convention the proxy software's snapshots use.
+  return {
+    input: perMillion(pricing.prompt) ?? 0,
+    output: perMillion(pricing.completion) ?? 0,
+    cache: {
+      read: perMillion(pricing.input_cache_read) ?? 0,
+      write: perMillion(pricing.input_cache_write) ?? 0,
+    },
+  }
 }
 
 export function toModels(providerID: string, raws: readonly Raw[]): Model.Info[] {
