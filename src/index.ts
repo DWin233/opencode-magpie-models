@@ -19,7 +19,7 @@ type Raw = {
 }
 
 // Partial in the same way the upstream pricing is: a missing sub-field is left out entirely.
-type ModelCost = { input?: number; output?: number; cache?: { read?: number; write?: number } }
+type ModelCost = { input: number; output: number; cache: { read: number; write: number } }
 
 const positive = (n: unknown): n is number => typeof n === "number" && Number.isInteger(n) && n > 0
 const strings = (a: unknown): a is string[] => Array.isArray(a) && a.length > 0 && a.every((s) => typeof s === "string")
@@ -40,11 +40,10 @@ const costOf = (pricing: Raw["pricing"]): ModelCost | undefined => {
   const write = perMillion(pricing.input_cache_write)
   if (input !== undefined) cost.input = input
   if (output !== undefined) cost.output = output
-  if (read !== undefined || write !== undefined) {
-    // The wire protocol requires both cache keys once cache is present; an unreported
-    // sub-price is treated as 0 (the same convention the proxy software writes out).
-    cost.cache = { read: read ?? 0, write: write ?? 0 }
-  }
+  // The wire protocol validates a cost entry strictly: cache is mandatory, and so are
+  // cache.read/cache.write once the object exists. An unreported sub-price becomes 0
+  // (the same convention the proxy software's snapshots use).
+  cost.cache = { read: perMillion(pricing.input_cache_read) ?? 0, write: perMillion(pricing.input_cache_write) ?? 0 }
   return cost
 }
 

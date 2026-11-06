@@ -16,14 +16,14 @@ test("maps per-token pricing to dollars per million tokens", () => {
   expect(m.cost).toEqual([{ input: 3, output: 15, cache: { read: 0.3, write: 3.75 } }])
 })
 
-test("writes only the pricing sub-fields Magpie provides", () => {
+test("fills absent prices with 0, cache is always complete", () => {
   const [m] = toModels("magpie-test", [{ id: "partial", pricing: { prompt: "0.000002" } }])
-  expect(m.cost).toEqual([{ input: 2 }])
+  expect(m.cost).toEqual([{ input: 2, output: 0, cache: { read: 0, write: 0 } }])
 })
 
-test("fills missing cache sub-prices with 0 once any cache price exists", () => {
+test("keeps both cache keys when only one cache price exists", () => {
   const [m] = toModels("magpie-test", [{ id: "read-only", pricing: { prompt: "0.000002", input_cache_read: "0.0000002" } }])
-  expect(m.cost).toEqual([{ input: 2, cache: { read: 0.2, write: 0 } }])
+  expect(m.cost).toEqual([{ input: 2, output: 0, cache: { read: 0.0000002 * 1e6, write: 0 } }])
 })
 
 test("leaves cost off a model without pricing", () => {
