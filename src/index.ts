@@ -13,17 +13,58 @@ type Raw = {
   modalities?: { input?: string[]; output?: string[] }
   reasoning?: boolean
   reasoning_levels?: string[]
+  // Per-token USD prices, as decimal strings. Free models omit the whole object.
+  pricing?: { prompt?: string; completion?: string; input_cache_read?: string; input_cache_write?: string }
+  tool_call?: boolean
 }
+
+// Partial in the same way the upstream pricing is: a missing sub-field is left out entirely.
+type ModelCost = { input?: number; output?: number; cache?: { read?: number; write?: number } }
 
 const positive = (n: unknown): n is number => typeof n === "number" && Number.isInteger(n) && n > 0
 const strings = (a: unknown): a is string[] => Array.isArray(a) && a.length > 0 && a.every((s) => typeof s === "string")
 
+// Magpie quotes USD per token; OpenCode's cost is USD per million tokens.
+const perMillion = (v: unknown): number | undefined => {
+  if (typeof v !== "string") return undefined
+  const n = Number.parseFloat(v)
+  return Number.isFinite(n) ? n * 1e6 : undefined
+}
+
+const costOf = (pricing: Raw["pricing"]): ModelCost | undefined => {
+  if (!pricing) return undefined
+  const cost: ModelCost = {}
+  const input = perMillion(pricing.prompt)
+  const output = perMillion(pricing.completion)
+  const read = perMillion(pricing.input_cache_read)
+  const write = perMillion(pricing.input_cache_write)
+  if (input !== undefined) cost.input = input
+  if (output !== undefined) cost.output = output
+  if (read !== undefined || write !== undefined) {
+    cost.cache = {}
+    if (read !== undefined) cost.cache.read = read
+    if (write !== undefined) cost.cache.write = write
+  }
+  return cost
+}
+
 export function toModels(providerID: string, raws: readonly Raw[]): Model.Info[] {
   const pid = Provider.ID.make(providerID)
   return raws.map((raw) => {
-    const base = Model.Info.default(pid, Model.ID.make(raw.id))
+    // A model without upstream pricing must have no cost field at all, so drop the default empty cost.
+    const { cost: _defaultCost, ...base } = Model.Info.default(pid, Model.ID.make(raw.id))
     // some vendors list them upper-case (Zed's Gemini: LOW); Magpie reads any case
     const levels = raw.reasoning && strings(raw.reasoning_levels) ? [...new Set(raw.reasoning_levels.map((l) => l.toLowerCase()))] : []
+    // A fast variant for every effort. service_tier is our own convention, not an upstream /v1/models field:
+    // Magpie's priority service tier is requested through the OpenAI-compatible body.
+    const variants = levels.flatMap((e) => [
+      { id: Model.VariantID.make(e), settings: { reasoningEffort: e } },
+      {
+        id: Model.VariantID.make(`${e}-fast`),
+        settings: { reasoningEffort: e, service_tier: "priority", extraBody: { service_tier: "priority" } },
+      },
+    ])
+    const cost = costOf(raw.pricing)
     return {
       ...base,
       name: raw.magpie_label ?? raw.display_name ?? raw.id,
@@ -32,8 +73,10 @@ export function toModels(providerID: string, raws: readonly Raw[]): Model.Info[]
         // Magpie rejects images for a model it marks blind, and OpenCode only sends what is declared
         input: strings(raw.modalities?.input) ? raw.modalities.input : ["text"],
         output: strings(raw.modalities?.output) ? raw.modalities.output : ["text"],
+        tools: raw.tool_call === true,
       },
-      variants: levels.map((e) => ({ id: Model.VariantID.make(e), settings: { reasoningEffort: e } })),
+      variants,
+      ...(cost ? { cost: cost as unknown as Model.Info["cost"] } : {}),
       limit: {
         context: positive(raw.context_length) ? raw.context_length : base.limit.context,
         output: positive(raw.max_output_tokens) ? raw.max_output_tokens : base.limit.output,
@@ -53,13 +96,14 @@ const home = (p: string) => (p.startsWith("~/") ? join(homedir(), p.slice(2)) : 
 export default Plugin.define({
   id: "opencode-magpie-models",
   async setup(ctx) {
-    const o = ctx.options as { baseURL?: unknown; keyFile?: unknown; id?: unknown; name?: unknown; refreshMinutes?: unknown }
-    if (typeof o.baseURL !== "string" || typeof o.keyFile !== "string")
-      throw new Error("opencode-magpie-models: options baseURL and keyFile are required")
-    const baseURL = o.baseURL.replace(/\/+$/, "")
-    const id = typeof o.id === "string" ? o.id : "magpie"
-    const name = typeof o.name === "string" ? o.name : "Magpie"
-    const key = (await readFile(home(o.keyFile), "utf8")).trim()
+    // A directory-discovery plugin gets no options, so configuration comes from env and constants.
+    const baseURL = (process.env.MAGPIE_BASE_URL ?? "http://127.0.0.1:8790/v1").replace(/\/+$/, "")
+    const keyFile = process.env.MAGPIE_KEY_FILE || undefined
+    const key = keyFile ? (await readFile(home(keyFile), "utf8")).trim() : "magpie"
+    // Test-phase id: the shipped form should make this configurable again and default to "magpie";
+    // "magpie-test" avoids colliding with the v1 provider block proxy software writes.
+    const id = "magpie-test"
+    const name = "Magpie"
     const cacheFile = join(process.env.XDG_CACHE_HOME || join(homedir(), ".cache"), "opencode-magpie-models", `${id}.json`)
 
     const fetchList = async () => {
@@ -96,7 +140,6 @@ export default Plugin.define({
     })
 
     // The background service lives for days: pick up models Magpie adds meanwhile.
-    const minutes = typeof o.refreshMinutes === "number" && o.refreshMinutes > 0 ? o.refreshMinutes : 60
     const timer = setInterval(async () => {
       try {
         const next = await fetchList()
@@ -106,7 +149,7 @@ export default Plugin.define({
       } catch (e) {
         console.error(`opencode-magpie-models: refresh failed: ${e}`)
       }
-    }, minutes * 60_000)
+    }, 60 * 60_000)
     return () => clearInterval(timer)
   },
 })
