@@ -88,6 +88,31 @@ export function toModels(providerID: string, raws: readonly Raw[]): Model.Info[]
   })
 }
 
+// modelFilter entries are case-insensitive substrings of the raw id ("vendor/model").
+// A leading "!" excludes; everything else includes. Includes narrow first, then excludes
+// remove — so ["claude", "!claude-haiku"] is "claude but not haiku", in either order.
+const parseFilter = (filter: unknown): { include: string[]; exclude: string[] } => {
+  const entries = (Array.isArray(filter) ? filter : [filter])
+    .filter((s): s is string => typeof s === "string")
+    .map((s) => s.trim())
+    .filter((s) => s !== "")
+  return {
+    include: entries.filter((s) => !s.startsWith("!")),
+    // strip exactly one "!", so "!!foo" excludes the literal substring "!foo"
+    exclude: entries.filter((s) => s.startsWith("!")).map((s) => s.slice(1)).filter((s) => s !== ""),
+  }
+}
+
+export function filterModels(raws: readonly Raw[], filter: unknown): Raw[] {
+  const { include, exclude } = parseFilter(filter)
+  // An empty filter (unset, "", "!", non-strings) means no filtering at all.
+  if (include.length === 0 && exclude.length === 0) return [...raws]
+  const hit = (id: string, pattern: string) => id.toLowerCase().includes(pattern.toLowerCase())
+  return raws.filter(
+    (raw) => (include.length === 0 || include.some((p) => hit(raw.id, p))) && !exclude.some((p) => hit(raw.id, p)),
+  )
+}
+
 export function parseList(body: unknown): Raw[] {
   const data = (body as { data?: unknown })?.data
   if (!Array.isArray(data)) throw new Error("no data array in the models response")
@@ -102,8 +127,8 @@ export default Plugin.define({
     // Options arrive through a config entry ({ package, options } in opencode.json);
     // a directory-discovered plugin gets none and falls back to env, then the
     // upstream defaults.
-    const o = (ctx.options ?? {}) as { baseURL?: unknown; keyFile?: unknown; id?: unknown; name?: unknown; refreshMinutes?: unknown }
-    const baseURL = (typeof o.baseURL === "string" ? o.baseURL : process.env.MAGPIE_BASE_URL ?? "http://127.0.0.1:8790/v1").replace(/\/+$/, "")
+    const o = (ctx.options ?? {}) as { baseURL?: unknown; keyFile?: unknown; id?: unknown; name?: unknown; refreshMinutes?: unknown; modelFilter?: unknown }
+    const baseURL = (typeof o.baseURL === "string" ? o.baseURL : process.env.MAGPIE_BASE_URL ?? "http://127.0.0.1:3425/v1").replace(/\/+$/, "")
     const keyFile = typeof o.keyFile === "string" ? o.keyFile : process.env.MAGPIE_KEY_FILE || undefined
     const key = keyFile ? (await readFile(home(keyFile), "utf8")).trim() : "magpie"
     const id = typeof o.id === "string" ? o.id : "magpie"
@@ -131,6 +156,14 @@ export default Plugin.define({
     }
 
     await ctx.provider.transform((editor) => {
+      // Filtering happens here, not before the cache write, so a changed modelFilter
+      // takes effect without a refetch and the cache stays one full upstream snapshot.
+      const models = toModels(id, filterModels(list, o.modelFilter))
+      // Registering an empty provider is harmless; failing here would take the whole
+      // config down, and falling back to "no filter" would silently ignore the setting.
+      if (list.length > 0 && models.length === 0) {
+        console.error(`opencode-magpie-models: modelFilter kept none of the ${list.length} models; the provider has no models`)
+      }
       editor.add({
         info: {
           ...Provider.Info.empty(Provider.ID.make(id)),
@@ -139,7 +172,7 @@ export default Plugin.define({
           package: "@opencode/ai/providers/openai-compatible",
           settings: { baseURL, apiKey: key },
         },
-        models: toModels(id, list),
+        models,
       })
     })
 
