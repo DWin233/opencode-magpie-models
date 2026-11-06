@@ -4,9 +4,15 @@
   "workspaces": {
     "": {
       "name": "opencode-magpie-models",
-      "dependencies": {
-        "@opencode/plugin": "2.1.2",
+      "devDependencies": {
+        "@opencode/plugin": ">=2.1.2",
       },
+      "peerDependencies": {
+        "@opencode/plugin": ">=2.1.2",
+      },
+      "optionalPeers": [
+        "@opencode/plugin",
+      ],
     },
   },
   "packages": {

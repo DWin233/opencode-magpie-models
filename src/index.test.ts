@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test"
-import { parseList, toModels } from "./index"
+import { parseList, filterModels, toModels } from "./index"
 
 test("maps per-token pricing to dollars per million tokens", () => {
   const [m] = toModels("magpie-test", [{
@@ -100,4 +100,46 @@ test("limit falls back to the model defaults for missing or invalid values", () 
 test("rejects a response without a data array and drops entries without an id", () => {
   expect(() => parseList({ error: "nope" })).toThrow()
   expect(parseList({ data: [{ id: "a" }, { id: 3 }, null] }).map((m) => m.id)).toEqual(["a"])
+})
+
+test("modelFilter keeps only ids containing an include pattern, ignoring case", () => {
+  const raws = [
+    { id: "opencode-go/kimi-k3" },
+    { id: "opencode-go/glm-5.3" },
+    { id: "qoder-cn/kmodel_latest" },
+  ]
+  expect(filterModels(raws, "KIMI").map((m) => m.id)).toEqual(["opencode-go/kimi-k3"])
+  // A single string is a one-pattern filter; a vendor prefix keeps the whole vendor.
+  expect(filterModels(raws, "opencode-go/").map((m) => m.id)).toEqual(["opencode-go/kimi-k3", "opencode-go/glm-5.3"])
+  expect(filterModels(raws, "Kmodel").map((m) => m.id)).toEqual(["qoder-cn/kmodel_latest"])
+})
+
+test("modelFilter includes are OR-ed", () => {
+  const raws = [{ id: "a/kimi-k3" }, { id: "a/glm-5.3" }, { id: "a/qwen3.8-max" }]
+  expect(filterModels(raws, ["kimi", "glm"]).map((m) => m.id)).toEqual(["a/kimi-k3", "a/glm-5.3"])
+})
+
+test("a leading ! excludes; excludes alone start from the full list", () => {
+  const raws = [{ id: "zen/beam-free" }, { id: "zen/glm-5.3-flash-free" }, { id: "go/glm-5.3" }]
+  expect(filterModels(raws, ["!free"]).map((m) => m.id)).toEqual(["go/glm-5.3"])
+})
+
+test("includes narrow first, then excludes win regardless of array order", () => {
+  const raws = [{ id: "go/claude-sonnet-5-5" }, { id: "go/claude-haiku-5-5" }, { id: "go/kimi-k3" }]
+  const expected = ["go/claude-sonnet-5-5"]
+  expect(filterModels(raws, ["claude", "!haiku"]).map((m) => m.id)).toEqual(expected)
+  expect(filterModels(raws, ["!haiku", "claude"]).map((m) => m.id)).toEqual(expected)
+})
+
+test("empty and non-string filter entries are no-ops; patterns are trimmed", () => {
+  const raws = [{ id: "a/kimi-k3" }, { id: "a/glm-5.3" }]
+  for (const filter of [undefined, null, "", "!", "   ", [], ["", "!"], [3, {}, null], 42]) {
+    expect(filterModels(raws, filter)).toHaveLength(2)
+  }
+  expect(filterModels(raws, "  kimi  ").map((m) => m.id)).toEqual(["a/kimi-k3"])
+})
+
+test("modelFilter that excludes everything yields an empty list", () => {
+  expect(filterModels([{ id: "a/kimi-k3" }], ["!kimi"])).toEqual([])
+  expect(filterModels([{ id: "a/kimi-k3" }], "nope")).toEqual([])
 })

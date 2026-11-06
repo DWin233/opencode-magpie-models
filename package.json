@@ -1,5 +1,5 @@
 {
-  "name": "opencode-magpie-models",
+  "name": "opencode-magpie-models-dev",
   "version": "0.2.0-rc.1",
   "description": "OpenCode V2 plugin: Magpie gateway models (names, limits, input types, reasoning levels) from its /v1/models, kept fresh",
   "type": "module",
@@ -9,8 +9,16 @@
   "scripts": {
     "test": "bun test"
   },
-  "dependencies": {
-    "@opencode/plugin": "2.1.2"
+  "peerDependencies": {
+    "@opencode/plugin": ">=2.1.2"
+  },
+  "peerDependenciesMeta": {
+    "@opencode/plugin": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "@opencode/plugin": ">=2.1.2"
   },
   "license": "MIT",
   "keywords": [
