@@ -176,14 +176,56 @@ export default Plugin.define({
       })
     })
 
+    // Shared by the hourly timer and the manual /fetch-magpie command, so both paths
+    // run the same fetch → change check → reload. One in-flight promise dedupes
+    // overlapping triggers (timer firing while a manual refresh is running) into
+    // a single fetch and reload.
+    let inFlight: Promise<{ changed: boolean; count: number }> | null = null
+    const refresh = (): Promise<{ changed: boolean; count: number }> => {
+      inFlight ??= (async () => {
+        const next = await fetchList()
+        // Unchanged upstream must not reload: reload replays every provider
+        // transform and rebuilds the active model result for no benefit.
+        if (JSON.stringify(next) === JSON.stringify(list)) return { changed: false, count: next.length }
+        list = next
+        await ctx.provider.reload()
+        return { changed: true, count: next.length }
+      })().finally(() => {
+        inFlight = null
+      })
+      return inFlight
+    }
+
+    // Manual trigger: /fetch-magpie fetches now instead of waiting for the timer.
+    await ctx.command.transform((editor) => {
+      editor.add({
+        name: "fetch-magpie",
+        description: "Refresh Magpie models from upstream and reload the provider",
+        execute: async ({ sessionID }) => {
+          let message = ""
+          try {
+            const { changed, count } = await refresh()
+            message = changed ? `Magpie models updated: ${count} models` : `Magpie models already up to date: ${count} models`
+          } catch (e) {
+            console.error(`opencode-magpie-models: refresh failed: ${e}`)
+            message = `Magpie refresh failed: ${e}`
+          }
+          // Synthetic with resume:false surfaces the result in the session without
+          // spending a model turn on it; a synthetic failure must not mask refresh.
+          try {
+            await ctx.session.synthetic({ sessionID, text: message, description: "fetch-magpie", resume: false })
+          } catch {
+            // Best-effort feedback only.
+          }
+        },
+      })
+    })
+
     // The background service lives for days: pick up models Magpie adds meanwhile.
     const minutes = typeof o.refreshMinutes === "number" && o.refreshMinutes > 0 ? o.refreshMinutes : 60
     const timer = setInterval(async () => {
       try {
-        const next = await fetchList()
-        if (JSON.stringify(next) === JSON.stringify(list)) return
-        list = next
-        await ctx.provider.reload()
+        await refresh()
       } catch (e) {
         console.error(`opencode-magpie-models: refresh failed: ${e}`)
       }

@@ -2,3 +2,4 @@ node_modules/
 
 # local test harness only; consumers configure their own opencode.json
 opencode.json
+dev/opencode.json
